@@ -145,7 +145,7 @@ This system also uses a notion of arguments, cases and "support" built on this
                         literals in {L} that are not in the antecedent of R.
 """
 # TODO: Should CCoSE's be minimal sets?
-from _ast import Attribute
+
 class Literal():
     """
     An object representing a simple logic literal that asserts either an atom,
@@ -163,6 +163,8 @@ class Literal():
         case (Case):
             The Case instance associated with this Literal. Needs to be set
             first time. Thereafter, it is read-only.
+        is_supported (bool):
+            True if this Literal is supported by its KB, False if not.
     """
     
     def __init__(self, atom, is_positive=None):
@@ -187,77 +189,61 @@ class Literal():
         
     @property  # no setter for atom; this value should not change.
     def atom(self):
-        """
-        Return type: str
-        
-        Read-only accessor for this Literal's atom.
-        """
+        """Read-only accessor for this Literal's atom."""
         return self._atom
     
     @property  # no setter for is_positive; this value should not change.
     def is_positive(self):
         """
-        Return type: bool
-        
         Read-only accessor for this Literal's sign; True if positive, False if
             negative.
         """
         return self._is_positive
-      
-    def is_negation_of(self, other):
-        """
-        Parameters:
-            other (Literal): The Literal instance to compare this Literal to.
-        Return type: bool
-        
-        Returns True if other is a Literal asserts the logical complement of
-            this Literal. Returns False otherwise.    
-        """
-        if isinstance(other, Literal):
-            return (self.atom == other.atom) and (self.is_positive != other.is_positive())
-        return False
 
     @property  # Raises AttributeError if called before self.case has been set.
     def case(self):
-        """
-        Return type: Case
-        
-        Accessor for self.case.
-        """
+        """Accessor for self.case."""
         return self._case
     # TODOD: Where this function is called, deal with AttributeError if raised.
 
     @case.setter  # The value of case can only be set once.
     def case(self, case):
         """
-        Parameters:
-            case (Case): The Case instance associated with this Literal.
-        Return type: None
-        
-        One-time setter for attribute self.case; its value does not change
-            thereafter.
+        One-time setter for self.case (to a Case obj); its value does not
+            change thereafter.
         """
-        if not hasattr(self, "_case"):  # If first time setting self.case
-            self._case = case
-        else:
+        if hasattr(self, "_case"):  # If not first time setting self.case
             raise AttributeError("attribute value can only be set once, and already has value: {}".format(self.case))
+        # TODO: Create check to ensure case is Case object.
+        #     Currently this property is assumed
+        self._case = case
     
-    @property
+    @property  # no setter for is_supported
     def is_supported(self):
         """
-        Return type: bool
-        
-        Returns True if this Literal is supported by the KB, and False if not.
-            This value is calculated only once on the first call.
-        Relies on the association of a Case object with self.case.
+        True if this Literal is supported by the KB, and False if not.
+        This value is calculated only once on the first call, and relies on the
+            association of a Case object with self.case.
         """
-        if hasattr(self, "_supported"):  # If not first call to this method
-            return self._supported
-        self._supported = self.case.is_supported  # May return AttributeError if self.case is not set.
+        if not hasattr(self, "_supported"):  # If first call to this method
+            # This Literal is supported iff self.case is supported
+            self._supported = self.case.is_supported  # May return AttributeError if self.case is not set.
         return self._supported
     
+    def is_negation_of(self, other):
+        """
+        Returns True if other is a Literal that asserts the logical complement
+            of this Literal. Returns False otherwise.    
+        """
+        if isinstance(other, Literal):
+            return (self.atom == other.atom) and (self.is_positive != other.is_positive())
+        return False
+        
     def __str__(self):
-        """Returns a string of the Literal instance in prolog syntax (w/o trailing fullstop)"""
+        """
+        Returns a string representation of this Literal in prolog syntax (w/o a 
+            trailing fullstop)
+        """
         if not self.is_positive:
             return "~" + self.atom
         return self.atom
@@ -265,33 +251,44 @@ class Literal():
     def __repr__(self):
         return str(self)
         
-    # Literal must be an immutable hashable type so Clause and KnowledgeBase 
-    #     (knowledgebase.py) classes0 can store Literal objects in a set.
     def __eq__(self, other):  # Needed for hashability of Literals
-        """Equality is based on the equality of the atom (str) and sign (boolean)."""
+        """
+        Equality is based on the equality of the atom (str) and is_positive
+            (bool).
+        """
         if isinstance(other, Literal):
             return (self.atom == other.atom) and (self.is_positive == other.is_positive)
         return False
     
     def __hash__(self):  # Needed for hashability of Literals
+        """Hash is based on self.atom and self.is_positive"""
         return hash((self.atom, self.is_positive))
     
 class Clause():
-    """An object that represents a simple logic clause that asserts a set of
+    """
+    An object that represents a simple logic clause that asserts a set of
         literals in conjunction.
     
-    :param literals: The literals asserted in logical conjunction by this Clause.
-    :type literals: A variable number of Literals.
+    Properties:
+        literals (set):
+            A set of the Literal instances this Clause asserts.
     
-    Note: Clause must be an immutable hashable type so KnowledgeBase
-        (knowledgebase.py) can store Clause objects in a set.     
+    :param literals: The literals asserted in logical conjunction by this Clause.
+    :type literals: A variable number of Literals.     
     """
     #TODO Implement checks to ensure literals is a nonempty iterable of Literals       
     def __init__(self, *literals):
+        """
+        Parameters:
+            literals (Variable number of Literals):
+                The Literal instances this Clause asserts.
+        Return type: None
+        """
         self._literals = frozenset(literals)
     
     @property  # no setter for literals
     def literals(self):
+        """Read-only accessor for self.literals"""
         return self._literals
     
     def __str__(self):
@@ -308,48 +305,69 @@ class Clause():
         return False
     
     def __hash__(self):  # Needed for hashability
+        """Hash is based on self.literals"""
         return hash(self.literals)
 
     def __repr__(self):
         return str(self)    
 
 class Rule():
-    """!
-    An object that represents a sinple logic rule that asserts that its head
-        (Literal) logically follows (modus ponens) from its body (Clause).
-        
-    :param head: The head (consequent) of the simple logic Rule.
-    :type head: Literal
-    :param body: The body (antecedent) of the simple logic Rule.
-    :type body: A variable number of Literals
+    """
+    An object that represents a simple logic rule that asserts that its head
+        or "consequent" (Literal) logically follows (modus ponens) from the
+        conjunction of the literals in its body or "antecedent" (set of
+        Literals).
     
-    Note: Rule must be an immutable hashable type so KnowledgeBase
-        (knowledgebase.py) can store Rule objects in a set.
+    Properties:
+        head (Literal):
+            The Literal that represents this Rule's consequent.
+        body (set of Literals):
+            The Literals which in conjunction represent this Rule's antecedent.
+        is_supported (bool):
+            True if this Rule is (equivalently, the Literals in its body are)
+            supported by its KB, False if not.
     """
     
-    #TODO Implement checks to ensure head is a Literal and body is a nonempty
-    #     iterable of Literals.
     def __init__(self, head, *body):
-        self._head = head  # should be a Literal
-        self._body = frozenset(body)  # should be a nonempty iterable of Literals
+        """
+        Parameters:
+            head (Literal):
+                The Literal that represents this simple logic Rule's consequent.
+            body (set of Literals):
+                The Literals which in conjunction represent this somple logic
+                Rule's antecedent.
+        Return type: None
+        """
+        # TODO: Implement check to ensure head is Literal.
+        #     Currently this property is assumed.
+        self._head = head
+        # TODO: Implement check to body is a nonempty iterable of Literals.
+        #     Currently this property is assumed.
+        self._body = frozenset(body)
     
-    @property  # no setter for head
+    @property  # no setter for head; this value should not change.
     def head(self):
+        """Read-only accessor for self.head"""
         return self._head
 
-    @property  # no setter for body
+    @property  # no setter for body; this value should not change.
     def body(self):
+        """Read-only accessor for self.body"""
         return self._body
     
-    @property
+    @property  # no setter for is_supported
     def is_supported(self):
-        if hasattr(self, "_supported"):  # If this method has been called before
-            return self._supported
-        supported = True
-        for l in self.body:
-            if not l.is_supported:
-                supported = False
-        self._supported = supported
+        """
+        True if this Rule is (or more, all the Literals in its body are)
+            supported by the KB, and False if not.
+        This value is calculated only once on the first call.
+        """
+        if not hasattr(self, "_supported"):  # If first call to this method
+            supported = True  # Assume this Rule is supported
+            for l in self.body:
+                if not l.is_supported:
+                    supported = False  # If any l is unsupported, so is R.
+            self._supported = supported
         return self._supported
     
     def __str__(self):
@@ -363,6 +381,7 @@ class Rule():
         return False
        
     def __hash__(self):  # Needed for hashability
+        """Hash is based on self.head and self.body"""
         return hash((self.head, self.body))
         
     def __repr__(self):

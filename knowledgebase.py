@@ -1,10 +1,10 @@
 '''
-Created on 12 Mar 2018
-
-@author: Coder
+amadeus.logic - A Simple Logic
+@author: Sh'kyra Jordon
+------------------------------
 '''
 from logic import Clause, Literal, Rule
-from distutils.tests import support
+from argumentation import Case
 
 class KnowledgeBase():
     """!
@@ -12,12 +12,13 @@ class KnowledgeBase():
         - Reading in simple logic* KB contents from a text file in prolog
             syntax, and store them in the appropriate format (i.e. as the
             Clause and Rule instances [defined in logic.py] they represent).
-        - Forming arguments inferred from these contents.
+        - Forming arguments** inferred from these contents.
      
     (*) This system assumes the same (simple) base logic (Besnard & Hunter
         2014) and consistency with prolog syntax as logic.py (see preamble of
-        logic.py). This system also uses the notion of Arguments and "support"
-        used by logic.py (see again the preamble of logic.py).
+        logic.py).
+    (**)This system also uses the notion of Cases, Arguments and "support"
+        used by argumentation.py (see preamble of argumentation.py).
         
     Note that this knowledge base forbids the inclusion of cycles.
     
@@ -248,57 +249,6 @@ class PrologString():
     def __str__(self):
         return super().__str__()    
 
-class Case():
-    
-    def __init__(self, literal, knowledgebase):
-        self._claim = literal
-        self._kb = knowledgebase
-        self.support_clauses, self.support_rules = set(), set()
-    
-    @property  # no setter for claim
-    def claim(self):
-        return self._claim
-    
-    @property  # no setter for kb
-    def kb(self):
-        return self._kb
-    
-    @property
-    def is_supported(self):
-        if hasattr(self, "_supported"):
-            return self._supported
-        supported = False  # Assume self.claim is not supported
-        
-        # Check for supporting clauses in the KB
-        self.support_clauses = self.kb._asserting_clauses[str(self.claim)]  # Discarding previous value of self.support_clauses
-        if len(self.support_clauses) != 0:  # if there is at least one supporting clause for self.claim
-            supported = True
-        
-        # Check for supporting Rules in the KB (i.e supported Rules that assert self.claim)
-        self.support_rules = set()  # Discarding previous value of self.support_rules
-        for r in self.kb._asserting_rules[str(self.claim)]:
-            if r.is_supported:
-                supported = True
-                self.support_rules.add(r)
-        
-        self.support_clauses, self.support_rules = frozenset(self.support_clauses), frozenset(self.support_rules)  # for hashability
-        
-        self._supported = supported
-        return self._supported
-    
-    def __str__(self): ###### TEMPORARY
-        return "({" + " ".join([str(c) for c in self.support_clauses] + [str(r) for r in self.support_rules]) + "}, " + str(self.claim) + ")" 
-    
-    def __repl__(self):
-        return str(self)
-    
-    def __hash__(self):
-        return hash((self.claim, self.kb))
-    
-    def __eq__(self, other):
-        if isinstance(other, Case):
-            return (self.claim == other.claim) and (self.kb == other.kb)
-        return False
         
 if __name__ == "__main__":
     
