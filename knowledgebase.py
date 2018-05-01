@@ -7,7 +7,7 @@ from logic import Clause, Literal, Rule
 from argumentation import Case
 
 class KnowledgeBase():
-    """!
+    """
     A knowledge base (KB) which is capable of:
         - Reading in simple logic* KB contents from a text file in prolog
             syntax, and store them in the appropriate format (i.e. as the
