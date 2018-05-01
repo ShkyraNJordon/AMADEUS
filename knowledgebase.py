@@ -22,58 +22,94 @@ class KnowledgeBase():
         
     Note that this knowledge base forbids the inclusion of cycles.
     
-    @param contents: The Clause and Rule objects intended to populate this KnowledgeBase, or a string representing a simple logic prolog-syntax knowledge base, or the filename to a text-file containing the same.
-    @type contents: A variable number of Clauses and Rules | A tuple with exactly one entry that is a valid parameter for PrologString.__init__
+    Properties:
+        clauses (set of Clauses):
+             A set of all Clauses in the KB
+        rules (set of Rules):
+            A set of all Rules in the KB
     """
   
-    #TODO Add cycle checking to __init__, and forbid cycles.
     def __init__(self, *contents):
-        self._clauses = set()  # to store Clause instances
-        self._rules = set()  # to store Rule instances
-        # thus Clause and Rule objects should be immutable hashable types.
-
-        if len(contents) == 1 and isinstance(contents[0], str):  # If contents is of type str, assume it is a simple logic prolog-syntax string, or the filename to a text-file containing the same.
-            ps = PrologString(contents[0])
+        """
+        Parameters:
+            contents (iterable of Clauses and Rules | str):
+                The contents intended for this KB.
+                This may be:
+                    - a variable number of Clause and Rule objects
+                    - a str representing either a simple logic prolog-syntax KB,
+                        or the filename of text-file containing the same. 
+        Return type: None
+        """
+        # GETTING KB CLAUSES, RULES AND LITERALS:
+        
+        # If contents has only one element, if it is of type str, assume it is
+        #     a simple logic prolog-syntax string, or the filename to a
+        #     text-file containing the same.
+        if len(contents) == 1 and isinstance(contents[0], str):
+            # Use PrologString to convert contents[0] into a set of Clauses and
+            #     a set of Rules, where contents[0] can be either a simple
+            #     logic prolog-syntax string, or a filename to a text-file
+            #     containing the same.
+            ps = PrologString(contents[0]) 
             
-            contents = ps.contents  # Get a set of Clauses and Rules from ps
+            # Get the dict mapping the str reprsentation of Literal instances to
+            #     their unique instances. Note that these are the exact Literal 
+            #     instances ps's Clauses and Rules reference. 
+            self._literals_dict = ps.literals 
+            self._clauses = ps.clauses  # Set of all Clauses
+            self._rules = ps.rules      # Set of all Rules
+        
+        # Otherwise, assume contents are all Clause and Rule instances that
+        #    possibly do not all reference the exact same set of Literal
+        #    instances, in which case, these need consolidation (recreating so
+        #    they all use the same Literal instances).
+        else:      
+            # The dict mapping the str reprsentation of Literal instances to
+            #     their unique instances. Note that these will be the exact
+            #     Literal instances our Clauses and Rules will reference.
+            self._literals_dict = dict()   
+            self._clauses = set()  # to store Clause instances
+            self._rules = set()    # to store Rule instances
+
             for content in contents:
                 if isinstance(content, Clause):
-                    self._clauses.add(content)
+                    # Consolidation of the Literals in content.literals
+                    literals = self._consolidate_literals(content.literals)
+                    # Creating a new Clause from these literals and storing.
+                    self._clauses.add(Clause(*literals))
                 elif isinstance(content, Rule):
-                    self._rules.add(content)
-                else:
-                    raise TypeError("Cannot add content of type {} to a KnowledgeBase".format(type(content).__name__))
-            self._literals = ps.literals  # And get the unique dictionary of all Literals from ps, indexed by their str representation
-            
-        else:  # Otherwise, assume contents are all Clause and Rule instances
-            # Add Clauses and Rules, consolidating (recreating) them so they reference the same Literal instances.
-            self._literals = dict()  # To be a dictionary of unique Literals, indexed by their str representation
-            for content in contents:
-                if isinstance(content, Clause):  # If content is a Clause
-                    # Consolidation:
-                    literals = self._consolidate_literals(content.literals)  # Create a set of consolidated Literals from the Literals in content.literals
-                    self._clauses.add(Clause(*literals))  # And add a Clause with this set as its contents
-                elif isinstance(content, Rule):  # If content is a Rule
-                    # Consolidation:
-                    head = self._consolidate_literal(content.head)  # Consolidate the Literal in content.head
-                    # onsolidate the Literals in content.body
+                    # Consolidation of the Literal in content.head
+                    head = self._consolidate_literal(content.head)
+                    # Consolidation of the Literals in content.body
                     body = self._consolidate_literals(content.body)
+                    # Creating a new Rule from this head and body, then storing.
                     self._rules.add(head, body)
                 else:
                     raise TypeError("Cannot add content of type {} to a KnowledgeBase".format(type(content).__name__))
-        self._clauses, self._rules = frozenset(self._clauses), frozenset(self._rules)  # helps with hashability of KBs
-               
-        # For each Literal in self._literals.values(), get the set of Clauses that assert it
-        # Then put these sets in a dictionary, indexed by the str representation of the Literal they assert.
-        self._asserting_clauses = self._get_asserting_clauses(self._literals.values())
+        
+        self._clauses, self._rules = frozenset(self._clauses), frozenset(self._rules)  # helps with hashability of KB
+        # TODO: Add cycle checking and forbid KB contents (abort) if cyclic.
+        
+        
+        # GETTING MAPPINGS FROM STR REPRESENTATIONS OF LITERALS TO:
+        #     - THE CLAUSES THAT ASSERT THEM
+        #     - THE RULES THAT ASSERT THEM
+        
+        # For each Literal L in self._literals_dict.values(), get the set of Clauses
+        #     that assert it in a dict, indexed by str(L).
+        self._asserting_clauses = self._get_asserting_clauses()
 
         # And do the same for Rules;
-        # For each Literal in self._literals.values(), get the set of Rules that assert it as its head
-        # Then put these sets in a dictionary, indexed by the str representation of the Literal they assert.
-        self._asserting_rules = self._get_asserting_rules(self._literals.values())
+        # For each Literal L in self._literals_dict.values(), get the set of Rules
+        # that assert it (as its head) in a dict, indexed by str(L).
+        self._asserting_rules = self._get_asserting_rules()
         
-        # For each Literal l in self._literals.values(), create a Case instance associated with both it and this KB, and assign it to l.case.
-        self._supporting_cases = self._generate_supporting_cases(self._literals.values())
+        # For each Literal L in self._literals_dict.values(), create a Case instance
+        # C such that L.case = C and C.claim = L.
+        self._supporting_cases = self._generate_supporting_cases()
+        
+        # CREATING ARGUMENTS FOR EACH LITERAL INSTANCE:
+        self._supported_literals = {k : v for k,v in self._literals_dict.items() if v.is_supported}
     
     @property  # no setter for clauses
     def clauses(self):
@@ -83,14 +119,16 @@ class KnowledgeBase():
     def rules(self):
         return self._rules
     
+
+    
     def _consolidate_literal(self, l):
         """
-        Function that returns the original version of Literal l in self._literals, or adds it if there is no original, and returns l.
+        Function that returns the original version of Literal l in self._literals_dict, or adds it if there is no original, and returns l.
         """
-        if not str(l) in self._literals:  # If l is a new Literal
-            self._literals[str(l)] = l  # Add it to self._literals
+        if not str(l) in self._literals_dict:  # If l is a new Literal
+            self._literals_dict[str(l)] = l  # Add it to self._literals_dict
         else:  # Otherwise, if l has been encountered before
-            l = self._literals[str(l)]  # Reference the original instead
+            l = self._literals_dict[str(l)]  # Reference the original instead
         return l
     
     def _consolidate_literals(self, literals):
@@ -99,40 +137,41 @@ class KnowledgeBase():
         """
         return set([self._consolidate_literal(l) for l in literals])
         
-    def _get_asserting_clauses(self, literals):
+    def _get_asserting_clauses(self):
         """
         # For each Literal in literals, get the set of Clauses that assert it
         # Then put these sets in a dictionary, indexed by the str representation of the Literal they assert.
         """
+        literals = self._literals_dict.values()  # Set of all Literal instances
         return {str(l) : set([clause for clause in self.clauses if l in clause.literals]) for l in literals}
     
-    def _get_asserting_rules(self, literals):
+    def _get_asserting_rules(self):
         """
         For each Literal in literals, get the set of Rules that assert it as its head
         # Then put these sets in a dictionary, indexed by the str representation of the Literal they assert.
         """
+        literals = self._literals_dict.values()  # Set of all Literal instances
         return {str(l) : set([rule for rule in self.rules if l == rule.head]) for l in literals}
     
-    def _generate_supporting_cases(self, literals):
+    def _generate_supporting_cases(self):
         """
         For each Literal l in literals, create a Case instance associated with both it and this KB, and assign it to l.case.
         """
+        literals = self._literals_dict.values()  # Set of all Literal instances
         cases = set()
         for l in literals:
+            # Assign a Case instance to each literal (calling l's one-time
+            #     setter for l.case)
             l.case = Case(l, self)
-            cases.add(l.case)
+            cases.add(l.case)  # Then add this Case instance to cases.
         return cases
     
-    def populate(self):
-        for l in self._literals.values():
-            l.is_supported  # prompts a l.case.is_supported call to populate case fields for all Literals
-
-    def get_arguments(self):
-        if hasattr(self, _arguments):
-            return self._arguments
-        # WRITE CODE TO ADD ARGUMENTS
-        # FIX COMMENTS
-        # MAKE LESS UGLY
+#     def get_arguments(self):
+#         if hasattr(self, _arguments):
+#             return self._arguments#
+#         # WRITE CODE TO ADD ARGUMENTS
+#         # FIX COMMENTS
+#         # MAKE LESS UGLY
 
     def __str__(self):
         """Returns a string representation of the KnowledgeBase contents in prolog syntax"""
@@ -147,9 +186,13 @@ class KnowledgeBase():
         return False
     
 class PrologString():
-    """!
-    A string representation of (simple logic) prolog-syntax Clauses and Rule
+    """
+    A string representation of (simple logic) prolog-syntax Clauses and Rules
         that can be converted to a set of corresponding Clause and Rule objects.
+    
+    Properties:
+    
+        
     
     @param s: A (simple logic) prolog-syntax string of Clauses and Rules, or the
         filename of a text-file containing the same.
@@ -165,33 +208,38 @@ class PrologString():
                 pass  # If not a file, assume s is intended to be a prolog-syntax string.
                 # TODO: A check to see if s is in prolog syntax can be implemented; If it is not in prolog syntax, raise. Otherwise, pass.
             
-            self._literals = dict()  # to hold the Literal instances shared between Clauses and Rules
-            self._contents = self._parse(s)
+            self._literals_dict = dict()  # to hold the Literal instances shared between Clauses and Rules
+            self._clauses, self._rules = self._parse(s)
         else:
             raise TypeError("PrologString takes a str input of a (simple logic) prolog-syntax knowledge base, or the filemame of a textfile containing the same. Invalid input: {}".format(repr(s)))
+  
+    @property  # no setter for clauses
+    def clauses(self):
+        return self._clauses
 
-    @property  # no setter for contents
-    def contents(self):
-        return self._contents
+    @property  # no setter for rules
+    def rules(self):
+        return self._rules
     
     @property  # no setter for literals
     def literals(self):
-        return self._literals
+        return self._literals_dict
 
     def _parse(self, s):
-        """Turns a string s in Prolog syntax into a set of clauses and Rules."""
+        """Turns a string s in Prolog syntax into a set of Clauses and a set of Rules."""
         
-        contents = set()
+        clauses = set()
+        rules = set()
         # TODO: Add syntax checks to ensure Clauses and Rules are in correct prolog-syntax before passing to the parsers.
         for p in s.split("."):  # Splitting s into statements
             p = p.strip()
             if p == "":  # Ignore empty strings (e.g trailing whitespace after last '.').
                 continue
             elif ":-" in p:  # If ":-" in p, assume p is a Rule
-                contents.add(self._parse_rule(p))
+                rules.add(self._parse_rule(p))
             else:  # Otherwise assume p is a Clause
-                contents.add(self._parse_clause(p))
-        return contents
+                clauses.add(self._parse_clause(p))
+        return clauses, rules
                 
     def _parse_rule(self, s):
         """Takes a string s, splits it around ':-', and assumes only 2 substrings will result from this, s1 and s2.
@@ -213,13 +261,13 @@ class PrologString():
             Otherwise, s is taken as a negative literal, and Literal(s, False) is returned.
         """
         s = s.strip()  # shouldn't need this since all functions that call this method strip s before call, but redundancy just in case.
-        if not s in self._literals:  # If we have not encountered this literal before
+        if not s in self._literals_dict:  # If we have not encountered this literal before
             if s[0] == "~":  # If this is a negative Literal
                 literal = Literal(s[1:], False)
             else:  # Otherwise this is a positive Literal
                 literal = Literal(s)
-            self._literals[s] = literal  # Add this Literal to all the set of all Literals
-        return self._literals[s]  # And return it
+            self._literals_dict[s] = literal  # Add this Literal to all the set of all Literals
+        return self._literals_dict[s]  # And return it
     
     def _parse_literals(self, s):
         """
@@ -257,19 +305,10 @@ beta. alpha, beta.
 beta:- alpha. gamma:- beta."""
     KB = KnowledgeBase(kb)
     print("KB:", str(KB).replace("\n", " "))
-    print("KB's Literals:", *KB._literals.values())
+    print("KB's Literals:", *KB._literals_dict.values())
     print("KB's dict of asserting clauses:", KB._asserting_clauses)
     print("KB's dict of asserting rules:", KB._asserting_rules)
     cases = KB._supporting_cases
 #     for case in cases:
 #         claim = case.claim
 #         print(claim, claim.case)
-    print("\nTIME TO POPUALTE")
-    KB.populate()
-    for case in cases:
-        print("Case for {}:".format(case.claim), case)
-        for r in case.support_rules:
-            print("\tFor rule {}:".format(r))
-            for l in r.body:
-                print("\t\tLiteral {} is supported; {}".format(l, l.case))
-        print()
