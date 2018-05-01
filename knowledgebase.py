@@ -73,7 +73,7 @@ class KnowledgeBase():
         
         # For each Literal l in self._literals.values(), create a Case instance associated with both it and this KB, and assign it to l.case.
         self._supporting_cases = self._generate_supporting_cases(self._literals.values())
-                    
+    
     @property  # no setter for clauses
     def clauses(self):
         return self._clauses
@@ -124,7 +124,14 @@ class KnowledgeBase():
     
     def populate(self):
         for l in self._literals.values():
-            l.is_supported()  # prompts a l.case.is_supported() call to populate
+            l.is_supported  # prompts a l.case.is_supported call to populate case fields for all Literals
+
+    def get_arguments(self):
+        if hasattr(self, _arguments):
+            return self._arguments
+        # WRITE CODE TO ADD ARGUMENTS
+        # FIX COMMENTS
+        # MAKE LESS UGLY
 
     def __str__(self):
         """Returns a string representation of the KnowledgeBase contents in prolog syntax"""
@@ -256,6 +263,7 @@ class Case():
     def kb(self):
         return self._kb
     
+    @property
     def is_supported(self):
         if hasattr(self, "_supported"):
             return self._supported
@@ -269,7 +277,7 @@ class Case():
         # Check for supporting Rules in the KB (i.e supported Rules that assert self.claim)
         self.support_rules = set()  # Discarding previous value of self.support_rules
         for r in self.kb._asserting_rules[str(self.claim)]:
-            if r.is_supported():
+            if r.is_supported:
                 supported = True
                 self.support_rules.add(r)
         
