@@ -309,5 +309,9 @@ beta:- alpha. gamma:- beta."""
     print("\nTIME TO POPUALTE")
     KB.populate()
     for case in cases:
-        claim = case.claim
-        print("Case for {}:".format(claim), claim.case)
+        print("Case for {}:".format(case.claim), case)
+        for r in case.support_rules:
+            print("\tFor rule {}:".format(r))
+            for l in r.body:
+                print("\t\tLiteral {} is supported; {}".format(l, l.case))
+        print()
