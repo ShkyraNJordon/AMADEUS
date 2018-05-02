@@ -104,7 +104,7 @@ class Literal():
             The Case instance associated with this Literal. Needs to be set
             first time. Thereafter, it is read-only.
         is_supported (bool):
-            True if this Literal is supported by its KB, False if not.
+            True if this Literal/its case is supported by its KB, False if not.
     """
     
     def __init__(self, atom, is_positive=None):
@@ -129,23 +129,18 @@ class Literal():
         
     @property  # no setter for atom; this value should not change.
     def atom(self):
-        """Read-only accessor for this Literal's atom."""
         return self._atom
     
     @property  # no setter for is_positive; this value should not change.
     def is_positive(self):
-        """
-        Read-only accessor for this Literal's sign; True if positive, False if
-            negative.
-        """
+        """Getter for this Literal's sign; True if positive, False if negative."""
         return self._is_positive
 
     @property  # Raises AttributeError if called before self.case has been set.
     def case(self):
-        """Accessor for self.case."""
         return self._case
     # TODOD: Where this function is called, deal with AttributeError if raised.
-
+    
     @case.setter  # The value of case can only be set once.
     def case(self, case):
         """
@@ -192,17 +187,12 @@ class Literal():
         return str(self)
         
     def __eq__(self, other):  # Needed for hashability of Literals
-        """
-        Equality is based on the equality of the atom (str) and is_positive
-            (bool).
-        """
         if isinstance(other, Literal):
             return (self.atom == other.atom) and (self.is_positive == other.is_positive)
         return False
     
     def __hash__(self):  # Needed for hashability of Literals
-        """Hash is based on self.atom and self.is_positive"""
-        return hash((self.atom, self.is_positive))
+        return hash((self.atom, self.is_positive, self._case))
     
 class Clause():
     """
@@ -211,24 +201,20 @@ class Clause():
     
     Properties:
         literals (set):
-            A set of the Literal instances this Clause asserts.
-    
-    :param literals: The literals asserted in logical conjunction by this Clause.
-    :type literals: A variable number of Literals.     
+            A set of the Literal instances this Clause asserts.   
     """
     #TODO Implement checks to ensure literals is a nonempty iterable of Literals       
     def __init__(self, *literals):
         """
         Parameters:
-            literals (Variable number of Literals):
-                The Literal instances this Clause asserts.
+            literals (One or more Literals):
+                The Literal instances this Clause asserts in conjunction.
         Return type: None
         """
         self._literals = frozenset(literals)
     
     @property  # no setter for literals
     def literals(self):
-        """Read-only accessor for self.literals"""
         return self._literals
     
     def __str__(self):
@@ -239,13 +225,11 @@ class Clause():
         return iter(self._literals)
         
     def __eq__(self, other):  # Needed for hashability
-        """Equality consistent with the equality of the Literals in literals (Frozenset)"""
         if isinstance(other, Clause):
-            return self.literals == other.literals
+            return self.literals == other.literals  # these are frozensets
         return False
     
     def __hash__(self):  # Needed for hashability
-        """Hash is based on self.literals"""
         return hash(self.literals)
 
     def __repr__(self):
@@ -253,10 +237,10 @@ class Clause():
 
 class Rule():
     """
-    An object that represents a simple logic rule that asserts that its head
-        or "consequent" (Literal) logically follows (modus ponens) from the
-        conjunction of the literals in its body or "antecedent" (set of
-        Literals).
+    An object that represents a simple logic rule that, where it asserts that
+        its head or "consequent" (Literal) logically follows (modus ponens)
+        from the conjunction of the literals in its body or "antecedent" (set
+        of Literals).
     
     Properties:
         head (Literal):
@@ -264,8 +248,8 @@ class Rule():
         body (set of Literals):
             The Literals which in conjunction represent this Rule's antecedent.
         is_supported (bool):
-            True if this Rule is (equivalently, the Literals in its body are)
-            supported by its KB, False if not.
+            True if all Literals in this Rule's body are supported by its KB,
+            False if not.
     """
     
     def __init__(self, head, *body):
@@ -274,7 +258,7 @@ class Rule():
             head (Literal):
                 The Literal that represents this simple logic Rule's consequent.
             body (set of Literals):
-                The Literals which in conjunction represent this somple logic
+                The Literals which in conjunction represent this simple logic
                 Rule's antecedent.
         Return type: None
         """
@@ -287,19 +271,17 @@ class Rule():
     
     @property  # no setter for head; this value should not change.
     def head(self):
-        """Read-only accessor for self.head"""
         return self._head
 
     @property  # no setter for body; this value should not change.
     def body(self):
-        """Read-only accessor for self.body"""
         return self._body
     
     @property  # no setter for is_supported
     def is_supported(self):
         """
-        True if this Rule is (or more, all the Literals in its body are)
-            supported by the KB, and False if not.
+        True if all Literals in this Rule's body are supported by the KB, and
+            False if not.
         This value is calculated only once on the first call.
         """
         if not hasattr(self, "_supported"):  # If first call to this method
@@ -315,13 +297,11 @@ class Rule():
         return str(self.head) + ":- " + ", ".join([str(l) for l in self.body]) + "."
     
     def __eq__(self, other):  # Needed for hashability
-        """Equality is based on the equality of the head (Literal) and body (Clause)"""
         if isinstance(other, Rule):
             return (self.head == other.head) and (self.body == other.body)
         return False
        
     def __hash__(self):  # Needed for hashability
-        """Hash is based on self.head and self.body"""
         return hash((self.head, self.body))
         
     def __repr__(self):
@@ -340,6 +320,9 @@ if __name__ == "__main__":
     print("We can test the equality of Literals...")
     print("\tnotraining == Literal('raining', False):", notraining == Literal("raining", False))
     
+    # TODO: demonstrate that literals with the same atom and sign are considered indistinct; use a set
+    # TODO: demo that literals with the same atom but opposite signs are negations of eachother; use Literal.is_negation_of(other)
+    
     print("\n")
     
     # Demonstrating the use of Clauses
@@ -351,9 +334,14 @@ if __name__ == "__main__":
     print("\tc1 == c2:", c1 == c2)
     print("\tc1 == Clause(notraining, happy):", c1 == Clause(notraining, happy))
 
+    # TODO: Demonstrate that Clauses with the "same" literals - different orders, different instances, are considered indistinct; use a set
+
     print("\n")
 
     # Demonstrating the use of Rules
     print("And we can create rules of inference from Literals: happy:- ~raining. goodday:- happy.")
     rain_is_sad, happy_is_good = Rule(happy, notraining), Rule(goodday, happy)
     print("\tprinting them as Rules:", rain_is_sad, happy_is_good)
+    
+    # Demo that Rules with the "same" head and the "same" body - different instances, different orders, are considered indistinct; use a set
+    # Demo with rules with more that one Literal in the body
