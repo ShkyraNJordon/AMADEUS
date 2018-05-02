@@ -24,7 +24,7 @@ This system also uses a notion of arguments, cases and "support" built on this
             - claim is a literal.
             - supports is a set of all CCoSEs for claim, as described above,
             
-        Note: All arguments for a claim can be produced from a claim's case. 
+        Note: All arguments for a claim can be produced from a claim's case.
         
     (*) The notion of SUPPORTING a Literal or Rule, and what a COMPLETE
         collection of supporting EVIDENCE (CCoSE) for these items is:
@@ -75,7 +75,7 @@ class Case():
     def __init__(self, literal, knowledgebase):
         self._claim = literal
         self._kb = knowledgebase
-        self.support_clauses, self.support_rules = set(), set()
+        self._support_clauses, self._support_rules = set(), set()
     
     @property  # no setter for claim
     def claim(self):
@@ -85,6 +85,14 @@ class Case():
     def kb(self):
         return self._kb
     
+    @property  # no setter for support_clauses
+    def support_clauses(self):
+        return self._support_clauses
+    
+    @property  # no setter for support_rules
+    def support_rules(self):
+        return self._support_rules
+    
     @property
     def is_supported(self):
         if hasattr(self, "_supported"):
@@ -92,24 +100,24 @@ class Case():
         supported = False  # Assume self.claim is not supported
         
         # Check for supporting clauses in the KB
-        self.support_clauses = self.kb._asserting_clauses[str(self.claim)]  # Discarding previous value of self.support_clauses
-        if len(self.support_clauses) != 0:  # if there is at least one supporting clause for self.claim
+        self._support_clauses = self.kb._asserting_clauses[str(self.claim)]  # Discarding previous value of self._support_clauses
+        if len(self._support_clauses) != 0:  # if there is at least one supporting clause for self.claim
             supported = True
         
         # Check for supporting Rules in the KB (i.e supported Rules that assert self.claim)
-        self.support_rules = set()  # Discarding previous value of self.support_rules
+        self._support_rules = set()  # Discarding previous value of self._support_rules
         for r in self.kb._asserting_rules[str(self.claim)]:
             if r.is_supported:
                 supported = True
-                self.support_rules.add(r)
+                self._support_rules.add(r)
         
-        self.support_clauses, self.support_rules = frozenset(self.support_clauses), frozenset(self.support_rules)  # for hashability
+        self._support_clauses, self._support_rules = frozenset(self._support_clauses), frozenset(self._support_rules)  # for hashability
         
         self._supported = supported
         return self._supported
     
     def __str__(self): ###### TEMPORARY
-        return "({" + " ".join([str(c) for c in self.support_clauses] + [str(r) for r in self.support_rules]) + "}, " + str(self.claim) + ")" 
+        return "({" + " ".join([str(c) for c in self._support_clauses] + [str(r) for r in self._support_rules]) + "}, " + str(self.claim) + ")" 
     
     def __repl__(self):
         return str(self)
