@@ -9,11 +9,19 @@ from argumentation import Case
 class KnowledgeBase():
     """
     A knowledge base (KB) which is capable of:
-        - Reading in simple logic* KB contents from a text file in prolog
-            syntax, and store them in the appropriate format (i.e. as the
-            Clause and Rule instances [defined in logic.py] they represent).
-        - Forming arguments** inferred from these contents.
-     
+        - Creating a simple logic* KB by either:
+            - Taking a collection of Clauses and Rules and recreating a set of
+                Literals, Clauses and Rules from them
+            - Reading in simple logic KB contents from a text-file in prolog
+                syntax, and creating sets of corresponding Literals, Clauses
+                and Rules.
+            - Taking a string representation of a simple logic KB from a string
+                in prolog syntax and creating sets of corresponding Literals, Clauses
+                and Rules.
+        - Generating a Case** instance for every Literal instance in the KB
+            (with which it mutually references), and prompting these Cases to
+            populate their supports (their "support" attributes).
+            
     (*) This system assumes the same (simple) base logic (Besnard & Hunter
         2014) and consistency with prolog syntax as logic.py (see preamble of
         logic.py).
@@ -35,10 +43,15 @@ class KnowledgeBase():
             contents (iterable of Clauses and Rules | str):
                 The contents intended for this KB.
                 This may be:
-                    - a variable number of Clause and Rule objects
+                    - One or more Clause or Rule objects
                     - a str representing either a simple logic prolog-syntax KB,
                         or the filename of text-file containing the same. 
         Return type: None
+        
+        Note that if a KB is created from Clauses and Rules, any references to
+            these Clauses or Rules, or the Literals they were built with, will
+            not point to any members within the new KB. These are recreated for
+            use in the new KB.
         """
         # GETTING KB CLAUSES, RULES AND LITERALS:
         
@@ -59,10 +72,17 @@ class KnowledgeBase():
             self._clauses = ps.clauses  # Set of all Clauses
             self._rules = ps.rules      # Set of all Rules
         
-        # Otherwise, assume contents are all Clause and Rule instances that
-        #    possibly do not all reference the exact same set of Literal
-        #    instances, in which case, these need consolidation (recreating so
-        #    they all use the same Literal instances).
+        # Otherwise, assume contents are all Clause and Rule instances, and
+        #     create a KB from them. Note that this method recreates all
+        #     Literals, Clauses and Rules to ensure:
+        #      - All Clauses and Rules point to the same set of Literal 
+        #         instances
+        #      - No Cases associated with foreign KBs accidentally make their
+        #         their way into this KB through association with a reused
+        #         Literal
+        # Note that this means references to the old Literal, Rule and Clause
+        #     instances that this KB is made from will not point to those in the
+        #     new KB
         else:      
             # The dict mapping the str reprsentation of Literal instances to
             #     their unique instances. Note that these will be the exact
@@ -82,8 +102,9 @@ class KnowledgeBase():
                     head = self._consolidate_literal(content.head)
                     # Consolidation of the Literals in content.body
                     body = self._consolidate_literals(content.body)
+       
                     # Creating a new Rule from this head and body, then storing.
-                    self._rules.add(head, body)
+                    self._rules.add(Rule(head, *body))
                 else:
                     raise TypeError("Cannot add content of type {} to a KnowledgeBase".format(type(content).__name__))
         
@@ -95,20 +116,22 @@ class KnowledgeBase():
         #     - THE CLAUSES THAT ASSERT THEM
         #     - THE RULES THAT ASSERT THEM
         
-        # For each Literal L in self._literals_dict.values(), get the set of Clauses
-        #     that assert it in a dict, indexed by str(L).
+        # For each Literal L in self._literals_dict.values(), get the set of
+        #     Clauses that assert it in a dict, indexed by str(L).
         self._asserting_clauses = self._get_asserting_clauses()
 
         # And do the same for Rules;
-        # For each Literal L in self._literals_dict.values(), get the set of Rules
-        # that assert it (as its head) in a dict, indexed by str(L).
+        # For each Literal L in self._literals_dict.values(), get the set of
+        #     Rules that assert it (as its head) in a dict, indexed by str(L).
         self._asserting_rules = self._get_asserting_rules()
         
         # For each Literal L in self._literals_dict.values(), create a Case instance
         # C such that L.case = C and C.claim = L.
         self._supporting_cases = self._generate_supporting_cases()
         
-        # CREATING ARGUMENTS FOR EACH LITERAL INSTANCE:
+        
+        # ASSOCIATING ALL CASES WITH THEIR SUPPORTING CLAUSES AND RULES:
+        #     - This process is prompted when is_supported() called on a Case
         self._supported_literals = {k : v for k,v in self._literals_dict.items() if v.is_supported}
     
     @property  # no setter for clauses
@@ -119,21 +142,18 @@ class KnowledgeBase():
     def rules(self):
         return self._rules
     
-
-    
     def _consolidate_literal(self, l):
         """
         Function that returns the original version of Literal l in self._literals_dict, or adds it if there is no original, and returns l.
         """
         if not str(l) in self._literals_dict:  # If l is a new Literal
-            self._literals_dict[str(l)] = l  # Add it to self._literals_dict
-        else:  # Otherwise, if l has been encountered before
-            l = self._literals_dict[str(l)]  # Reference the original instead
-        return l
+            self._literals_dict[str(l)] = Literal(l.atom, l.is_positive)  # Recreate and add to self._literals_dict
+        return self._literals_dict[str(l)]  # And return our unique instance
     
     def _consolidate_literals(self, literals):
         """
-        Function that runs self._consolidate_literal on an iterable of Literals
+        Function that runs self._consolidate_literal on an iterable of Literals,
+            and returns as a set
         """
         return set([self._consolidate_literal(l) for l in literals])
         
@@ -153,18 +173,20 @@ class KnowledgeBase():
         literals = self._literals_dict.values()  # Set of all Literal instances
         return {str(l) : set([rule for rule in self.rules if l == rule.head]) for l in literals}
     
-    def _generate_supporting_cases(self):
-        """
-        For each Literal l in literals, create a Case instance associated with both it and this KB, and assign it to l.case.
-        """
-        literals = self._literals_dict.values()  # Set of all Literal instances
-        cases = set()
-        for l in literals:
-            # Assign a Case instance to each literal (calling l's one-time
+     def _generate_supporting_cases(self):
+         """
+         This function generates the Cases for each unique Literal instance in
+             this KB. Each Case mutually references its corresponding Literal
+             instance, also referencing the KB it belongs to.
+         """
+         literals = self._literals_dict.values()  # Set of all Literal instances
+         cases = set()
+         for l in literals:
+             # Assign a Case instance to each literal  (calling l's one-time
             #     setter for l.case)
-            l.case = Case(l, self)
-            cases.add(l.case)  # Then add this Case instance to cases.
-        return cases
+             l.case = Case(l, self)
+             cases.add(l.case)  # Then add this Case instance to cases.
+         return cases
     
 #     def get_arguments(self):
 #         if hasattr(self, _arguments):
@@ -302,13 +324,32 @@ if __name__ == "__main__":
     
     kb = """
 beta. alpha, beta.
-beta:- alpha. gamma:- beta."""
-    KB = KnowledgeBase(kb)
-    print("KB:", str(KB).replace("\n", " "))
-    print("KB's Literals:", *KB._literals_dict.values())
-    print("KB's dict of asserting clauses:", KB._asserting_clauses)
-    print("KB's dict of asserting rules:", KB._asserting_rules)
-    cases = KB._supporting_cases
+beta:- alpha. ~gamma:- beta."""
+    KB1 = KnowledgeBase(kb)
+    KB2 = KnowledgeBase("test file input to KB.txt")
+    KB3 = KnowledgeBase(Clause( Literal("beta") ),
+                        Clause( Literal("alpha"), Literal("beta") ),
+                        Rule( Literal("beta"), Literal("alpha") ),
+                        Rule( Literal("gamma", False), Literal("beta") ))
+    
+    print("KB1:", str(KB1).replace("\n", " "))
+    print("KB2:", str(KB2).replace("\n", " "))
+    print("KB3:", str(KB3).replace("\n", " "))
+    
+    print("KB1's Literals:", *KB1._literals_dict.values())
+    print("KB2's Literals:", *KB2._literals_dict.values())
+    print("KB3's Literals:", *KB3._literals_dict.values())
+
+    print("KB1's dict of asserting clauses:", KB1._asserting_clauses)
+    print("KB2's dict of asserting clauses:", KB2._asserting_clauses)
+    print("KB3's dict of asserting clauses:", KB3._asserting_clauses)
+
+    print("KB1's dict of asserting rules:", KB1._asserting_rules)
+    print("KB2's dict of asserting rules:", KB2._asserting_rules)
+    print("KB3's dict of asserting rules:", KB3._asserting_rules)
+    
+    cases = KB1._supporting_cases
 #     for case in cases:
 #         claim = case.claim
 #         print(claim, claim.case)
+
