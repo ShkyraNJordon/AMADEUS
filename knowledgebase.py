@@ -173,28 +173,21 @@ class KnowledgeBase():
         literals = self._literals_dict.values()  # Set of all Literal instances
         return {str(l) : set([rule for rule in self.rules if l == rule.head]) for l in literals}
     
-     def _generate_supporting_cases(self):
-         """
+    def _generate_supporting_cases(self):
+        """
          This function generates the Cases for each unique Literal instance in
              this KB. Each Case mutually references its corresponding Literal
              instance, also referencing the KB it belongs to.
          """
-         literals = self._literals_dict.values()  # Set of all Literal instances
-         cases = set()
-         for l in literals:
-             # Assign a Case instance to each literal  (calling l's one-time
+        literals = self._literals_dict.values()  # Set of all Literal instances
+        cases = set()
+        for l in literals:
+            # Assign a Case instance to each literal  (calling l's one-time
             #     setter for l.case)
-             l.case = Case(l, self)
-             cases.add(l.case)  # Then add this Case instance to cases.
-         return cases
+            l.case = Case(l, self)
+            cases.add(l.case)  # Then add this Case instance to cases.
+        return cases
     
-#     def get_arguments(self):
-#         if hasattr(self, _arguments):
-#             return self._arguments#
-#         # WRITE CODE TO ADD ARGUMENTS
-#         # FIX COMMENTS
-#         # MAKE LESS UGLY
-
     def __str__(self):
         """Returns a string representation of the KnowledgeBase contents in prolog syntax"""
         return "".join(["{}\n".format(str(s)) for s in self.clauses.union(self.rules)])
