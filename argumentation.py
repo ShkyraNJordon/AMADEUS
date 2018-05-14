@@ -75,7 +75,8 @@ class Case():
     def __init__(self, literal, knowledgebase):
         self._claim = literal
         self._kb = knowledgebase
-        self._support_clauses, self._support_rules = set(), set()
+        self._asserting_clauses = frozenset(self.kb._asserting_clauses[str(self.claim)])
+        self._asserting_rules = frozenset(self.kb._asserting_rules[str(self.claim)])
     
     @property  # no setter for claim
     def claim(self):
@@ -85,39 +86,48 @@ class Case():
     def kb(self):
         return self._kb
     
-    @property  # no setter for support_clauses
-    def support_clauses(self):
-        return self._support_clauses
+    @property  # no setter for asserting_clauses
+    def asserting_clauses(self):  
+        return self._asserting_clauses
     
-    @property  # no setter for support_rules
-    def support_rules(self):
-        return self._support_rules
+    @property  # no setter for asserting_rules
+    def asserting_rules(self):
+        return self._asserting_rules
+    
+    # Initiates is_entailed for this case (which in turn value for self.supporting_rules)
+    @property  # no setter for supporting_rules
+    def supporting_rules(self):
+        if not hasattr(self, "_supporting_rules"):
+            self.is_entailed  # This function will calculate self._supporting_rules
+        return self._supporting_rules
     
     @property
-    def is_supported(self):
-        if hasattr(self, "_supported"):
-            return self._supported
-        supported = False  # Assume self.claim is not supported
-        
-        # Check for supporting clauses in the KB
-        self._support_clauses = self.kb._asserting_clauses[str(self.claim)]  # Discarding previous value of self._support_clauses
-        if len(self._support_clauses) != 0:  # if there is at least one supporting clause for self.claim
-            supported = True
-        
-        # Check for supporting Rules in the KB (i.e supported Rules that assert self.claim)
-        self._support_rules = set()  # Discarding previous value of self._support_rules
-        for r in self.kb._asserting_rules[str(self.claim)]:
-            if r.is_supported:
-                supported = True
-                self._support_rules.add(r)
-        
-        self._support_clauses, self._support_rules = frozenset(self._support_clauses), frozenset(self._support_rules)  # for hashability
-        
-        self._supported = supported
-        return self._supported
+    def is_contained(self):
+        if not hasattr(self, "_contained"):  # If we haven't done this check before, calculate its value     
+            self._contained = False  # First assume self.claim is not contained in self.kb  
+            self._asserting_clauses = frozenset(self.kb._asserting_clauses[str(self.claim)])  # Get all supporting clauses in the self.kb for self.claim
+            if len(self._asserting_clauses) != 0:  # If there exists any clauses in self.kb that assert self.claim
+                self._contained = True  # Then self.claim is contained in self.kb
+        return self._contained
+    
+    # Generates self.supporting_rules
+    @property
+    def is_entailed(self):
+        if not hasattr(self, "_entailed"):  # If we haven't done this check before, calculate its value     
+            entailed = False  # Assume self.claim is not entailed by self.kb   
+            # Check for supporting Rules in the KB (i.e supported Rules that assert self.claim)
+            self._supporting_rules = set()
+            for r in self.asserting_rules:
+                if r.is_supported:
+                    entailed = True  # If any such rules exist, self.claim is supported
+                    self._supporting_rules.add(r)
+                    # Keep checking through all asserting_rules so all _supporting_rules can be found
+            self._supporting_rules = frozenset(self._supporting_rules)  # for hashability
+            self._entailed = entailed
+        return self._entailed
     
     def __str__(self): ###### TEMPORARY
-        return "({" + " ".join([str(c) for c in self._support_clauses] + [str(r) for r in self._support_rules]) + "}, " + str(self.claim) + ")" 
+        return "({" + " ".join([str(c) for c in self._asserting_clauses] + [str(r) for r in self._asserting_rules]) + "}, " + str(self.claim) + ")" 
     
     def __repl__(self):
         return str(self)

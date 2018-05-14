@@ -7,8 +7,8 @@ This system assumes the following (simple logic) base logic (Besnard & Hunter
 2014) and is consistent with the prolog syntax:
 
     Atoms:
-        An atom is an atomic formula (as in mathematical logic), aka the
-        assertion of an atomic logical statement.
+        An atom is an atomic formula (as in mathematical logic), aka an atomic
+        logical assertion.
         
         - Atoms are denoted by some alpha-numerical string that accepts 
             underscores, and contains at least one non-numerical character).
@@ -153,17 +153,28 @@ class Literal():
         #     Currently this property is assumed
         self._case = case
     
-    @property  # no setter for is_supported
-    def is_supported(self):
+    @property  # no setter for is_contained
+    def is_contained(self):
         """
-        True if this Literal is supported by the KB, and False if not.
+        True if this Literal is contained by the KB, and False if not.
         This value is calculated only once on the first call, and relies on the
             association of a Case object with self.case.
         """
-        if not hasattr(self, "_supported"):  # If first call to this method
+        if not hasattr(self, "_contained"):
+            self._contained = self.case.is_contained
+        return self._contained
+    
+    @property  # no setter for is_entailed
+    def is_entailed(self):
+        """
+        True if this Literal is entailed by the KB, and False if not.
+        This value is calculated only once on the first call, and relies on the
+            association of a Case object with self.case.
+        """
+        if not hasattr(self, "_entailed"):  # If first call to this method
             # This Literal is supported iff self.case is supported
-            self._supported = self.case.is_supported  # May return AttributeError if self.case is not set.
-        return self._supported
+            self._entailed = self.case.is_entailed  # May return AttributeError if self.case is not set.
+        return self._entailed
     
     def is_negation_of(self, other):
         """
@@ -192,7 +203,7 @@ class Literal():
         return False
     
     def __hash__(self):  # Needed for hashability of Literals
-        return hash((self.atom, self.is_positive, self._case))
+        return hash((self.atom, self.is_positive))
     
 class Clause():
     """
@@ -280,15 +291,16 @@ class Rule():
     @property  # no setter for is_supported
     def is_supported(self):
         """
-        True if all Literals in this Rule's body are supported by the KB, and
-            False if not.
+        True if all Literals in this Rule's body are entailed or contained by
+            the KB, and False if not.
         This value is calculated only once on the first call.
         """
         if not hasattr(self, "_supported"):  # If first call to this method
             supported = True  # Assume this Rule is supported
             for l in self.body:
-                if not l.is_supported:
+                if not (l.is_entailed or l.is_contained):  # If a literal in self.body is neither entailed, nor contained by its knowledge base
                     supported = False  # If any l is unsupported, so is R.
+                    # Keep running through this loop so all literals are asked the questions: "Are you entailed?" and "Are you contained?".
             self._supported = supported
         return self._supported
     

@@ -131,8 +131,8 @@ class KnowledgeBase():
         
         
         # ASSOCIATING ALL CASES WITH THEIR SUPPORTING CLAUSES AND RULES:
-        #     - This process is prompted when is_supported() called on a Case
-        self._supported_literals = {k : v for k,v in self._literals_dict.items() if v.is_supported}
+        #     - This process is prompted when is_entailed() called on a Case
+        self._supported_literals = {k : v for k,v in self._literals_dict.items() if v.is_entailed}
     
     @property  # no setter for clauses
     def clauses(self):
