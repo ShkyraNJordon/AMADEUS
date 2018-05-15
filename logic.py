@@ -85,6 +85,7 @@ This system also uses the notion of Cases, Arguments and "support" used by
     argumentation.py (see preamble of argumentation.py).
 """
 # TODO: Should CCoSE's be minimal sets?
+from ast import literal_eval
 
 class Literal():
     """
@@ -185,6 +186,12 @@ class Literal():
             return (self.atom == other.atom) and (self.is_positive != other.is_positive())
         return False
         
+    def negated(self):
+        """
+        Returns a literal instance with the same atom, but an opposite sign
+        """
+        return Literal(self.atom, not self.is_positive)
+
     def __str__(self):
         """
         Returns a string representation of this Literal in prolog syntax (w/o a 
@@ -232,8 +239,8 @@ class Clause():
         """Returns a string of the Clause instance in prolog syntax"""
         return ", ".join([str(l) for l in sorted(list(self.literals), key=lambda x: str(x))]) + "."
     
-    def __iter__(self):  # Iterating over a Clause iterates over its Literal(s)
-        return iter(self._literals)
+#     def __iter__(self):  # Iterating over a Clause iterates over its Literal(s)
+#         return iter(self._literals)
         
     def __eq__(self, other):  # Needed for hashability
         if isinstance(other, Clause):
@@ -321,39 +328,29 @@ class Rule():
         
 if __name__ == "__main__":
     
-    # Demonstrating the use of Literals
-    print("Let's directly create literals: ~raining. happy. goodday.")
-    notraining, happy, goodday = Literal("raining", False), Literal("happy"), Literal("goodday")
-    print("\tprinting them as Literals:", notraining, happy, goodday)
+    """
+    Let's directly create a few literals with the following meanings:
+        happy := I am happy
+        work_well := I work well
+    """
+    happy, work_well = Literal("happy"), Literal("work_well")
+    print("Created literals:", happy, work_well, sep="\n\t")
     
-    print("Note that these do not print with trailing '.' because they are not considered whole logcial statements unless enclosed in a Clause.")
-    print("\tprinting them as Clauses:", Clause(notraining), Clause(happy), Clause(goodday))
-    
-    print("We can test the equality of Literals...")
-    print("\tnotraining == Literal('raining', False):", notraining == Literal("raining", False))
-    
-    # TODO: demonstrate that literals with the same atom and sign are considered indistinct; use a set
-    # TODO: demo that literals with the same atom but opposite signs are negations of eachother; use Literal.is_negation_of(other)
-    
-    print("\n")
-    
-    # Demonstrating the use of Clauses
-    print("From this, let's make two clauses: ~raining, happy. happy, goodday.")
-    c1, c2 = Clause(notraining, happy), Clause(happy, goodday)
-    print("\tprinting these Clauses as c1:", c1, "and c2:", c2)
-    
-    print("We can test the equality of Clauses")
-    print("\tc1 == c2:", c1 == c2)
-    print("\tc1 == Clause(notraining, happy):", c1 == Clause(notraining, happy))
+    """
+    Let's directly create a clause asserting the following literals, with the following meanings:
+        sunny := It is sunny.
+        stay_home := I stay home
+    """
+    sunny, stay_home = Literal("sunny"), Literal("stay_home")
+    my_day = Clause(sunny, stay_home)
+    print("Created clause:", my_day)
 
-    # TODO: Demonstrate that Clauses with the "same" literals - different orders, different instances, are considered indistinct; use a set
-
-    print("\n")
-
-    # Demonstrating the use of Rules
-    print("And we can create rules of inference from Literals: happy:- ~raining. goodday:- happy.")
-    rain_is_sad, happy_is_good = Rule(happy, notraining), Rule(goodday, happy)
-    print("\tprinting them as Rules:", rain_is_sad, happy_is_good)
-    
-    # Demo that Rules with the "same" head and the "same" body - different instances, different orders, are considered indistinct; use a set
-    # Demo with rules with more that one Literal in the body
+    """
+    Let's create a few rules to explain some relationships between these literals.
+        r1: ~happy :- sunny, stay_home := If it is sunny and I stay home, I am not happy
+        r2: ~work_well :- stay_home := If I stay home, I do not work well
+        r3: happy :- stay_home := If I stay home, I am happy
+        r4: work_well :- happy := If I am happy, I work well
+    """
+    r1, r2, r3, r4 = Rule(happy.negated(), sunny, stay_home), Rule(work_well.negated(), stay_home), Rule(happy, stay_home), Rule(work_well, happy)
+    print("Created rules:", r1, r2, r3, r4, sep="\n\t")
