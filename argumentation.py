@@ -95,6 +95,7 @@ class Case():
         return self._asserting_rules
     
     # Initiates is_entailed for this case (which in turn value for self.supporting_rules)
+    
     @property  # no setter for supporting_rules
     def supporting_rules(self):
         if not hasattr(self, "_supporting_rules"):

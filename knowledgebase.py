@@ -5,6 +5,9 @@ amadeus.logic - A Simple Logic
 '''
 from logic import Clause, Literal, Rule
 from argumentation import Case
+from itertools import product, chain
+from functools import reduce
+from operator import concat
 
 class KnowledgeBase():
     """
@@ -127,8 +130,7 @@ class KnowledgeBase():
         
         # For each Literal L in self._literals_dict.values(), create a Case instance
         # C such that L.case = C and C.claim = L.
-        self._supporting_cases = self._generate_supporting_cases()
-        
+        self._cases = self._generate_cases(
         
         # ASSOCIATING ALL CASES WITH THEIR SUPPORTING CLAUSES AND RULES:
         #     - This process is prompted when is_entailed() called on a Case
@@ -141,6 +143,10 @@ class KnowledgeBase():
     @property  # no setter for rules
     def rules(self):
         return self._rules
+    
+    @property  # mo setter fpr cases
+    def cases(self):
+        return self._cases
     
     def _consolidate_literal(self, l):
         """
@@ -173,7 +179,7 @@ class KnowledgeBase():
         literals = self._literals_dict.values()  # Set of all Literal instances
         return {str(l) : set([rule for rule in self.rules if l == rule.head]) for l in literals}
     
-    def _generate_supporting_cases(self):
+    def _generate_cases(self):
         """
          This function generates the Cases for each unique Literal instance in
              this KB. Each Case mutually references its corresponding Literal
@@ -314,35 +320,87 @@ class PrologString():
 
         
 if __name__ == "__main__":
-    
-    kb = """
-beta. alpha, beta.
-beta:- alpha. ~gamma:- beta."""
-    KB1 = KnowledgeBase(kb)
-    KB2 = KnowledgeBase("test file input to KB.txt")
-    KB3 = KnowledgeBase(Clause( Literal("beta") ),
-                        Clause( Literal("alpha"), Literal("beta") ),
-                        Rule( Literal("beta"), Literal("alpha") ),
-                        Rule( Literal("gamma", False), Literal("beta") ))
-    
-    print("KB1:", str(KB1).replace("\n", " "))
-    print("KB2:", str(KB2).replace("\n", " "))
-    print("KB3:", str(KB3).replace("\n", " "))
-    
-    print("KB1's Literals:", *KB1._literals_dict.values())
-    print("KB2's Literals:", *KB2._literals_dict.values())
-    print("KB3's Literals:", *KB3._literals_dict.values())
+    """ FOR TESTINNG THAT KnowledgeBase INPUT METHODS ALL FUNCTION THE SAME """
+#     kb = """
+# beta. alpha, beta.
+# beta:- alpha. ~gamma:- beta."""
+#     KB1 = KnowledgeBase(kb)
+#     KB2 = KnowledgeBase("test file input to KB.txt")
+#     KB3 = KnowledgeBase(Clause( Literal("beta") ),
+#                         Clause( Literal("alpha"), Literal("beta") ),
+#                         Rule( Literal("beta"), Literal("alpha") ),
+#                         Rule( Literal("gamma", False), Literal("beta") ))
+#     
+#     print("KB1:", str(KB1).replace("\n", " "))
+#     print("KB2:", str(KB2).replace("\n", " "))
+#     print("KB3:", str(KB3).replace("\n", " "))
+#     
+#     print("KB1's Literals:", *KB1._literals_dict.values())
+#     print("KB2's Literals:", *KB2._literals_dict.values())
+#     print("KB3's Literals:", *KB3._literals_dict.values())
+# 
+#     print("KB1's dict of asserting clauses:", KB1._asserting_clauses)
+#     print("KB2's dict of asserting clauses:", KB2._asserting_clauses)
+#     print("KB3's dict of asserting clauses:", KB3._asserting_clauses)
+# 
+#     print("KB1's dict of asserting rules:", KB1._asserting_rules)
+#     print("KB2's dict of asserting rules:", KB2._asserting_rules)
+#     print("KB3's dict of asserting rules:", KB3._asserting_rules)
 
-    print("KB1's dict of asserting clauses:", KB1._asserting_clauses)
-    print("KB2's dict of asserting clauses:", KB2._asserting_clauses)
-    print("KB3's dict of asserting clauses:", KB3._asserting_clauses)
+    """ FOR GETTING ALL ARGUMENTS IN A KNOWLEDGE BASE """
+    """
+    Let's create the following knowledge base with prolog syntax:
+        MEANINGS OF LITERALS:
+            happy                          := I am happy
+            work_well                      := I work well
+            sunny                          := It is sunny
+            stay_home                      := I stay home
+        MEANING OF CLAUSES:
+            sunny, stay_home.               := It was sunny and I stayed home
+        MEANING OF RULES:
+            ~happy :- sunny, stay_home.     := If it is sunny and I stay home, I am not happy
+            ~work_well :- stay_home.        := If I stay home, I do not work well
+            happy :- stay_home.             := If I stay home, I am happy
+            work_well :- happy.             := If I am happy, I work well
+    """
+    prolog_kb = """
+        sunny, stay_home.
+        ~happy :- sunny, stay_home.
+        ~work_well :- stay_home.
+        happy :- stay_home.
+        work_well :- happy.
+    """
+   
+#     prolog_kb = "a:- b. b:-c. a:-c. a. b, c."
 
-    print("KB1's dict of asserting rules:", KB1._asserting_rules)
-    print("KB2's dict of asserting rules:", KB2._asserting_rules)
-    print("KB3's dict of asserting rules:", KB3._asserting_rules)
+    kb = KnowledgeBase(prolog_kb)
     
-    cases = KB1._supporting_cases
-#     for case in cases:
-#         claim = case.claim
-#         print(claim, claim.case)
+    print("KB:", kb, sep="\n")
+    for case in kb.cases:
+        print("claim:", case.claim, "\n\tclauses:", *case.asserting_clauses, "\n\trules:", *case.supporting_rules)
+    
+    def rule_supporting_evidence(r):
+        """
+        Returns a collection (generator) of sets of supporting evidence for Rule r.
+        """
+        yield from (reduce(set().union, ccose).union({r})  for ccose in product(*(literal_supporting_evidence(l) for l in r.body)))
+        """
+        Equivalent to:
+        antecedent_evidence_items = [literal_supporting_evidence(l.case) for l in r.body]
+        for antecedent_evidence_item in product(*antecedent_evidence_items):
+            yield reduce(set().union, antecedent_evidence_item).union({r})
+        """ 
+    
+    def literal_supporting_evidence(l):
+        """
+        Returns a collection (generator) of sets of supporting evidence for the Literal l.
+        """
+        c = l.case
+        yield from ({clause} for clause in c.asserting_clauses)  # base step: yield each asserting clause of l as a set
+        yield from chain.from_iterable((rule_supporting_evidence(r) for r in c.supporting_rules))  # recursive step: yield each collection of supporting evidence for (supported) asserted rules of l (as a set)
 
+    for l in kb._supported_literals.values():
+        print("\nArguments for {}:".format(l))
+        supporting_evidence = chain.from_iterable((rule_supporting_evidence(r) for r in l.case.supporting_rules))
+        print(*supporting_evidence, sep=" ")
+    
