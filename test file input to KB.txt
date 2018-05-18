@@ -1,0 +1,2 @@
+beta. alpha, beta.
+beta:- alpha. ~gamma:- beta.
