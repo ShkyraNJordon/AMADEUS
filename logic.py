@@ -80,8 +80,25 @@ This system assumes the following (simple logic) base logic (Besnard & Hunter
         A knowledge base is a collection of logical statements.
         
         Note: A KB's "content" refers to the clauses and rules it asserts.
+        
+    Containment:
+        A literal is contained in its knowledge base if, within it, there exists
+            a clause that asserts it.
+            
+        Any clause from the set of asserting clauses of a literal provides
+            sufficient evidence of that literal's containment.
+    
+    Entailment:
+        A literal is entailed by its knowledge base if, within it, there exists
+            a rule that asserts this literal as its consequent, and all the
+            antecedent literals of this rule are either contained, or entailed
+            by the knowledge base.
+        
+        Any rule from the set of rules that assert a literal (as its consequent),
+            and contain only contained or entailed antecedent literals, provides
+            sufficient evidence of that literal's entailment.
 
-This system also uses the notion of Cases, Arguments and "support" used by
+This system also uses the notion of Cases and "support" used by
     argumentation.py (see preamble of argumentation.py).
 """
 # TODO: Should CCoSE's be minimal sets?
