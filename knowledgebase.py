@@ -130,7 +130,7 @@ class KnowledgeBase():
         
         # For each Literal L in self._literals_dict.values(), create a Case instance
         # C such that L.case = C and C.claim = L.
-        self._cases = self._generate_cases(
+        self._cases = self._generate_cases()
         
         # ASSOCIATING ALL CASES WITH THEIR SUPPORTING CLAUSES AND RULES:
         #     - This process is prompted when is_entailed() called on a Case
@@ -197,15 +197,7 @@ class KnowledgeBase():
     def __str__(self):
         """Returns a string representation of the KnowledgeBase contents in prolog syntax"""
         return "".join(["{}\n".format(str(s)) for s in self.clauses.union(self.rules)])
-    
-    def __hash__(self):
-        return hash((self.clauses, self.rules))
-    
-    def __eq__(self, other):
-        if isinstance(other, KnowledgeBase):
-            return (self.clauses == other.clauses) and (self.rules == other.rules)
-        return False
-    
+         
 class PrologString():
     """
     A string representation of (simple logic) prolog-syntax Clauses and Rules
