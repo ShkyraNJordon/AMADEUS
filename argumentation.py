@@ -6,68 +6,43 @@ amadeus.logic - A Simple Logic
 This system assumes the same (simple) base logic (Besnard & Hunter 2014) and
     consistency with prolog syntax as logic.py (see preamble of logic.py).
 
-This system also uses a notion of arguments, cases and "support" built on this
-(simple logic) base logic:
-    Argument:
-        An argument is in the form:
-            (support, claim)
-        where:
-            - claim is a literal.
-            - support is a complete collection of supporting evidence (CCoSE)*
-                for claim, and may consist of a combination of clauses and
-                supporting rules from its KB.
-    
+This system also uses a notion of cases and "support" built on this
+(simple logic) base logic, and so, given a knowledge base:
+    Support:
+        A rule supports its consequent (head) literal with respects to its
+            knowledge base KB, if every literal in its antecedent (body) is
+            either contained by, or entailed by, KB. 
     Case:
         A case is in the form:
-            (supports, claim)
+            (claim, asserting_clauses, supporting_rules)
         where:
             - claim is a literal.
-            - supports is a set of all CCoSEs for claim, as described above,
+            - asserting_clauses is a set of all clauses in the knowledge base
+                that assert this case's claim.
+            - supporting_rules is a set of all supported rules in the knowledge
+                base that assert our claim as their consequent.
             
         Note: All arguments for a claim can be produced from a claim's case.
         
-    (*) The notion of SUPPORTING a Literal or Rule, and what a COMPLETE
-        collection of supporting EVIDENCE (CCoSE) for these items is:
+    (*) Given a knowledge base KB, a COMPLETE COLLECTION OF SUPPORTING EVIDENCE
+        (CCoSE) is:
     
         For a LITERAL:
-            A SUPPORTED LITERAL:
-                A Literal L is supported iff there exists in its KB at least
-                one supporting clause or rule.
-            A CCoSE FOR A SUPPORTED LITERAL:
-                L is supported iff at least one complete collections of
-                supporting evidence (CCoSE) for L exists and may consist of a
-                combination of clauses and supporting rules from its KB.
-                A CCoSE for L is a set of clauses and supporting rules that
-                contains either:
-                    - A clause in the KB that supports L.
-                    - A supported rule R in the KB that supports L, with the
-                        addition of the contents of a CCoSE for R.
-            SUPPORTING CLAUSES AND RULES OF A LITERAL:
-                - A clause C in a KB supports a Literal L if L is one of the
-                    literals C asserts.
-                - A rule R in a KB supports a literal L if L i its consequent,
-                    and R itself is supported.
-        
+            A CCoSE FOR AN ENTAILED LITERAL L:
+                Given a literal L entailed by KB, a CCoSE of L is:
+                    - A set containing a rule R in KB that supports L, and a
+                        CCoSE of R.
         For a RULE:
-            A SUPPORTED RULE:
-                A rule R is supported iff its antecedent contains only
-                supported Literals.
-            A CCoSE FOR A SUPPORTED RULE:
-                R is supported iff at least one CCoSE for R exists and may
-                consist of a combination of clauses and supporting rules from
-                its KB.
-                A CCoSE for R is a set of clauses and supporting rules that
-                contain:
-                    - Any union of exactly one CCoSE per antecedent literal of
-                        R.
-            SUPPORTING LITERALS OF A RULE:
-                - A literal L may contribute to the support of a rule R if L is
-                    in R's antecedent, and L itself is supported.
-                - A combination of literals {L} support R if every literal in
-                    R's antecedent is in {L}, and each such literal is itself
-                    supported.
-                    - Further, {L} minimally supports R if there are no
-                        literals in {L} that are not in the antecedent of R.
+            A CCoSE FOR A RULE R THAT SUPPORTS ITS CONSEQUENT LITERAL L wrt KB:
+                Given a rule R that supports its consequent literal L, a CCoSE
+                    of R is:
+                    - A set containing, for every antecedent literal L_i, a set
+                        of supporting evidence for either the containment of,
+                        or entailment of L_i by KB.
+
+    (**) Note: Any union of supporting evidence sets for the containment or
+        entailment of the antecedent literals L_i of a rule R, where each L_i
+        contributes exactly one such set to this union, is a CCoSE of R.
 '''
 
 class Case():
