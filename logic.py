@@ -238,10 +238,7 @@ class Clause():
     def __str__(self):
         """Returns a string of the Clause instance in prolog syntax"""
         return ", ".join([str(l) for l in sorted(list(self.literals), key=lambda x: str(x))]) + "."
-    
-#     def __iter__(self):  # Iterating over a Clause iterates over its Literal(s)
-#         return iter(self._literals)
-        
+         
     def __eq__(self, other):  # Needed for hashability
         if isinstance(other, Clause):
             return self.literals == other.literals  # these are frozensets
